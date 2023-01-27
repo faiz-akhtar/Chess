@@ -1,40 +1,57 @@
-body{
-    line-height:1;
-  }
-  p {
-      margin-top: 1rem;
-      margin-bottom: 1rem;
-  }
-  .chessboard {
-      font-family: freeserif ;
-      width: 570px;
+body {
+    line-height: 1;
+}
+
+p {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.chessboard {
+    font-family: freeserif;
+    width: 570px;
     margin: auto auto;
-      height: 570px;
-      border: 5px solid #333;
-  }
-  .black {
-      float: left;
-      width: 70px;
-      height: 70px;
-      background-color: #80aaff;
-        font-size:50px;
-      text-align:center;
-      display: table-cell;
-      vertical-align:middle;
-  }
-  .white {
-      float: left;
-      width: 70px;
-      height: 70px;
-      background-color: #fff;
-      font-size:50px;
-      text-align:center;
-      display: table-cell;
-      vertical-align:middle;
-  }
-  .player {
+    height: 570px;
+    border: 5px solid #333;
+}
+
+.black {
+    float: left;
+    width: 70px;
+    height: 70px;
+    background-color: #80aaff;
+    font-size: 50px;
+    text-align: center;
+    display: table-cell;
+    vertical-align: middle;
+}
+
+.white {
+    float: left;
+    width: 70px;
+    height: 70px;
+    background-color: #fff;
+    font-size: 50px;
+    text-align: center;
+    display: table-cell;
+    vertical-align: middle;
+}
+
+.player {
     text-align: center;
     margin: 5px;
     font-weight: bold;
+}
+
+/* class to disable selection of element by dragging the mouse */
+.noselect {
+    -webkit-touch-callout: none; /* iOS Safari */
+      -webkit-user-select: none; /* Safari */
+          -ms-user-select: none; /* Internet Explorer/Edge */
+              user-select: none; /* Non-prefixed version, currently
+                                    supported by Chrome, Edge, Opera and Firefox */
   }
-  
+
+  .hidden{
+    display:none;
+  }
