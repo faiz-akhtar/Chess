@@ -619,7 +619,7 @@ class Board {
                 var pieceImageHTML = "";
                 var id = square.getY() * BOARDSIZE.HEIGHT + square.getX();
                 if (!square.isEmpty()) {
-                    pieceImageHTML = "<img class='noselect' src='Images/" + square.getPiece().getColor() + square.getPiece().getType() + ".png' ondragstart='onDragStart(event)'>";  //event listener for drag event. img draggable by default.
+                    pieceImageHTML = "<img class='noselect' src='./Images/" + square.getPiece().getColor() + square.getPiece().getType() + ".png' ondragstart='onDragStart(event)'>";  //event listener for drag event. img draggable by default.
                 }
                 //console.log(pieceImageHTML);
                 rowHTML += "<div ondragover='onDragOver(event)' ondrop='onDrop(event)' id=" + id + " class='" + color + " square'>" + pieceImageHTML + "</div>";
