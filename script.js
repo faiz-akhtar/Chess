@@ -1,143 +1,692 @@
-const boardSize = 8; //Number of squares in one row or column.
-const totalSquares = boardSize * boardSize;
+const COLOR = Object.freeze({
+    WHITE: 'WHITE',
+    BLACK: 'BLACK',
+})
 
-//Unicode Symbols for Chess pieces. No longer needed on board as png images are in use. Useful in the future in annotation etc.
-// const unicodeSymbols = {
-//     "Br": "&#9820",
-//     "Bn": "&#9822",
-//     "Bb": "&#9821",
-//     "Bq": "&#9819",
-//     "Bk": "&#9818",
-//     "Bp": "&#9823",
-//     "Wr": "&#9814",
-//     "Wn": "&#9816",
-//     "Wb": "&#9815",
-//     "Wq": "&#9813",
-//     "Wk": "&#9812",
-//     "Wp": "&#9817",
-//     "": ""
-// }
+const GAMESTATE = Object.freeze({
+    ACTIVE: 'ACTIVE',
+    CHECKMATE: 'CHECKMATE',
+    STALEMATE: 'STALEMATE',
+    DRAWN: 'DRAWN',
+})
 
-//Generate the board HTML.
-//Generating from white side and moving to black side.
-function renderBoard(board) {
-    console.log("Rendering new board.");
-    let boardHTML = "";
-    for (let i = 0; i < boardSize; i++) {
-        let rowHTML = "";
-        for (let j = 0; j < boardSize; j++) {
-            let square = boardSize * i + j;
-            //Color based on distance from A1 square
-            let color = (((square % boardSize + Math.floor(square / boardSize)) % 2) === 0) ? "white" : "black";
-            let pieceImageHTML="";
-            if(board[square].piece!==""){
-                pieceImageHTML= "<img class='noselect' src='images/"+board[square].piece+".png' ondragstart='onDragStart(event)'>";  //event listener for drag event. img draggable by default.
-            }
-            rowHTML += "<div ondragover='onDragOver(event)' ondrop='onDrop(event)' id="+square+" class='" + color + " square'>"+pieceImageHTML+"</div>";
-        }
-        boardHTML = rowHTML + boardHTML; //Order important 
-    }
-    //console.log(boardHTML);
-    $(".chessboard").html(boardHTML);
+const PIECE = Object.freeze({
+    KING: 'KING',
+    ROOK: 'ROOK',
+    QUEEN: 'QUEEN',
+    BISHOP: 'BISHOP',
+    KNIGHT: 'KNIGHT',
+    PAWN: 'PAWN',
+})
+
+const BOARDSIZE = Object.freeze({
+    HEIGHT: 8,
+    WIDTH: 8,
+})
+
+function togglePlayer(player) {
+    return player === COLOR.WHITE ? COLOR.BLACK : COLOR.WHITE;
 }
 
-//Pieces at a particular position in the beginning.
-//First letter denotes color, 'n' is Knight to avoid conflict with King.
-//Empty squares return empty string.
-//Does not use boardSize constant. Not usable for custom board.
-function initPieceAtPos(i) {
-    switch (i) {
-        case 0:
-        case 7:
-            return "Wr";
-        case 1:
-        case 6:
-            return "Wn";
-        case 2:
-        case 5:
-            return "Wb";
-        case 3:
-            return "Wq";
-        case 4:
-            return "Wk";
-        case 8:
-        case 9:
-        case 10:
-        case 11:
-        case 12:
-        case 13:
-        case 14:
-        case 15:
-            return "Wp";
-        case 48:
-        case 49:
-        case 50:
-        case 51:
-        case 52:
-        case 53:
-        case 54:
-        case 55:
-            return "Bp";
-        case 56:
-        case 63:
-            return "Br";
-        case 57:
-        case 62:
-            return "Bn";
-        case 58:
-        case 61:
-            return "Bb";
-        case 59:
-            return "Bq";
-        case 60:
-            return "Bk";
-        default:
-            return "";
-    }
-};
+class abstractPiece {
+    type;
+    color;
 
-function onDragStart(event) {
+    constructor() {
+        if (this.constructor === abstractPiece) {
+            throw new Error("Abstract Class Piece cannot be instantiated!");
+        }
+    }
+
+    //Return an array of moves. All validation done EXCEPT king safety.
+    getMoves(src, board) {
+        var straightMoves = [];
+        var diagonalMoves = [];
+        var moveDir = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+        var maxSize = Math.max(BOARDSIZE.HEIGHT, BOARDSIZE.WIDTH);
+        for (var i = 0; i < moveDir.length; i++) {
+            for (var j = 0; j < maxSize; j++) {
+                var currSquare = board.getSquare(src.getX() + j * moveDir[i][0], src.getY() + j * moveDir[i][1]);
+                if (currSquare === src) continue;
+                if (currSquare !== null) {
+                    if (currSquare.isEmpty()) {
+                        if (i < 4) {
+                            straightMoves.push(currSquare);
+                        } else {
+                            diagonalMoves.push(currSquare);
+                        }
+                        continue;
+                    }
+                    if (currSquare.getPiece().getColor() === togglePlayer(src.getPiece().getColor())) {
+                        if (i < 4) {
+                            straightMoves.push(currSquare);
+                        } else {
+                            diagonalMoves.push(currSquare);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return [straightMoves, diagonalMoves];
+    }
+
+    //Raw move. Board is responsible for validation.
+    moveTo(src, moveSquare) {
+        moveSquare.setPiece(this);
+        src.setPiece(null);
+    }
+
+    getType() {
+        return this.type;
+    }
+
+    getColor() {
+        return this.color;
+    }
+
+    getCopyPiece() {
+
+    }
+}
+
+class Pawn extends abstractPiece {
+    constructor(color) {
+        super(color);
+        this.color = color;
+        this.type = PIECE.PAWN;
+    }
+
+    getMoves(src, board) {
+        console.log("In getmoves");
+        var moveList = [];
+        var moveDir = (this.color === COLOR.WHITE ? 1 : -1);
+        var startY = (this.color === COLOR.WHITE ? 1 : 6);
+        //console.log(src);
+        var nextSquare = board.getSquare(src.getX(), src.getY() + moveDir);
+        //console.log(nextSquare);
+        if (nextSquare.isEmpty()) {
+            moveList.push(nextSquare);
+            var nextToNextSquare = board.getSquare(src.getX(), src.getY() + 2 * moveDir);
+            //console.log(nextToNextSquare);
+            if (src.getY() === startY && nextToNextSquare.isEmpty()) {
+                moveList.push(nextToNextSquare);
+            }
+        }
+        //console.log(moveList);
+        var diagonalSquare1 = board.getSquare(src.getX() - 1, src.getY() + moveDir);
+        var diagonalSquare2 = board.getSquare(src.getX() + 1, src.getY() + moveDir);
+        var rival = togglePlayer(src.getPiece().getColor());
+        if (diagonalSquare1 !== null && !diagonalSquare1.isEmpty() && diagonalSquare1.getPiece().getColor() === rival) moveList.push(diagonalSquare1);
+        if (diagonalSquare2 !== null && !diagonalSquare2.isEmpty() && diagonalSquare2.getPiece().getColor() === rival) moveList.push(diagonalSquare2);
+
+        if (board.getTurn() !== 1) {
+            var lastMove = board.getMoveRecord(board.getTurn() - 1);
+            console.log(board.getTurn() - 1);
+            console.log(lastMove);
+            if (diagonalSquare1 !== null && lastMove.Piece === PIECE.PAWN && Math.abs(lastMove.From[1] - lastMove.To[1]) === 2 && diagonalSquare1 === board.getSquare(lastMove.From[0], (lastMove.From[1] + lastMove.To[1]) / 2)) moveList.push(diagonalSquare1);
+            if (diagonalSquare2 !== null && lastMove.Piece === PIECE.PAWN && Math.abs(lastMove.From[1] - lastMove.To[1]) === 2 && diagonalSquare2 === board.getSquare(lastMove.From[0], (lastMove.From[1] + lastMove.To[1]) / 2)) moveList.push(diagonalSquare2);
+        }
+        //console.log(moveList);
+        return moveList;
+    }
+
+    moveTo(src, moveSquare) {
+        super.moveTo(src, moveSquare);
+        if (moveSquare.getY() === 0 || moveSquare.getY() === BOARDSIZE.HEIGHT - 1) {
+            this.promote(moveSquare);
+        }
+        //TODO: EN Passant
+    }
+
+    promote(square) {
+
+        var promoteTo = prompt("Promote pawn to which piece? (Q/R/B/N)");
+        if (promoteTo === "Q") {
+            square.setPiece(new Queen(square.getPiece().getColor));
+        } else if (promoteTo === "R") {
+            square.setPiece(new Rook(square.getPiece().getColor));
+        } else if (promoteTo === "B") {
+            square.setPiece(new Bishop(square.getPiece().getColor));
+        } else if (promoteTo === "N") {
+            square.setPiece(new Knight(square.getPiece().getColor));
+        } else {
+            alert("Unrecognized piece. Promoting to Queen. You are welcome.");
+            square.setPiece(new Queen(square.getPiece().getColor));
+        }
+    }
+
+    getCopyPiece() {
+        return new Pawn(this.color);
+    }
+}
+
+class King extends abstractPiece {
+    hasMoved;
+    constructor(color) {
+        super(color);
+        this.color = color;
+        this.type = PIECE.KING;
+        this.hasMoved = false;
+    }
+
+    getMoves(src, board) {
+        var moveList = [];
+
+        for (var i = -1; i <= 1; i++) {
+            for (var j = -1; j <= 1; j++) {
+                var currSquare = board.getSquare(src.getX() + i, src.getY() + j);
+                if (currSquare !== null && (currSquare.isEmpty() || currSquare.getPiece().getColor() === togglePlayer(src.getPiece().getColor()))) {
+                    moveList.push(currSquare);
+                }
+            }
+        }
+
+        //TODO:Castling
+        return moveList;
+    }
+
+    moveTo(src, moveSquare) {
+        super.moveTo(src, moveSquare);
+        this.hasMoved = true;
+    }
+
+    getCopyPiece() {
+        return new King(this.color);
+    }
+}
+
+class Queen extends abstractPiece {
+    constructor(color) {
+        super(color);
+        this.color = color;
+        this.type = PIECE.QUEEN;
+    }
+
+    getMoves(src, board) {
+        var moveList = super.getMoves(src, board);
+        return moveList[0].concat(moveList[1]);
+    }
+
+    getCopyPiece() {
+        return new Queen(this.color);
+    }
+}
+
+class Rook extends abstractPiece {
+    hasMoved;
+    constructor(color) {
+        super(color);
+        this.color = color;
+        this.type = PIECE.ROOK;
+        this.hasMoved = false;
+    }
+
+    getMoves(src, board) {
+        var moveList = super.getMoves(src, board);
+        return moveList[0];
+    }
+
+    moveTo(src, moveSquare) {
+        super.moveTo(src, moveSquare);
+        this.hasMoved = true;
+    }
+
+    getCopyPiece() {
+        return new Rook(this.color);
+    }
+}
+
+class Bishop extends abstractPiece {
+    constructor(color) {
+        super(color);
+        this.color = color;
+        this.type = PIECE.BISHOP;
+    }
+
+    getMoves(src, board) {
+        var moveList = super.getMoves(src, board);
+        return moveList[1];
+    }
+
+    getCopyPiece() {
+        return new Bishop(this.color);
+    }
+}
+
+class Knight extends abstractPiece {
+    constructor(color) {
+        super(color);
+        this.color = color;
+        this.type = PIECE.KNIGHT;
+    }
+
+    getMoves(src, board) {
+        var moveList = [];
+
+        for (var i = -2; i <= 2; i++) {
+            for (var j = -2; j <= 2; j++) {
+                if ((Math.abs(i) === 2 && Math.abs(j) === 1) || (Math.abs(i) === 1 && Math.abs(j) === 2)) {
+                    var currSquare = board.getSquare(src.getX() + i, src.getY() + j);
+                    if (currSquare !== null && (currSquare.isEmpty() || currSquare.getPiece().getColor() === togglePlayer(src.getPiece().getColor()))) {
+                        moveList.push(currSquare);
+                    }
+                }
+            }
+        }
+        console.log(moveList);
+        return moveList;
+    }
+
+    getCopyPiece() {
+        return new Knight(this.color);
+    }
+}
+
+class Square {
+    x;
+    y;
+    color;
+    piece;
+
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+    }
+
+    isEmpty() {
+        return this.piece === null;
+    }
+
+    setPiece(piece) {
+        this.piece = piece;
+    }
+
+    getPiece() {
+        return this.piece;
+    }
+
+    getX() {
+        return this.x;
+    }
+
+    getY() {
+        return this.y;
+    }
+
+    getColor() {
+        return this.color;
+    }
+}
+
+class Board {
+    squares = [];
+    capturedPieces = [];
+    moveHistory = [];
+    turn = 1;
+
+    constructor(board = null) {
+        if (board === null) return;
+        this.squares = [];
+        for (var i = 0; i < BOARDSIZE.WIDTH; i++) {
+            this.squares[i] = [];
+            for (var j = 0; j < BOARDSIZE.HEIGHT; j++) {
+                this.squares[i][j] = new Square(i, j, board.getSquare(i, j).getColor());
+                var currPiece = board.getSquare(i, j).getPiece();
+                if (currPiece !== null) {
+                    this.squares[i][j].setPiece(currPiece.getCopyPiece());
+                } else {
+                    this.squares[i][j].setPiece(null);
+                }
+            }
+        }
+        this.turn = board.turn;
+        this.capturedPieces = JSON.parse(JSON.stringify(board.getCapturedPieces()));
+        this.moveHistory = JSON.parse(JSON.stringify(board.getMoveHistory()));
+    }
+
+    init() {
+        this.squares = [];
+        for (var i = 0; i < BOARDSIZE.WIDTH; i++) {
+            this.squares[i] = [];
+            for (var j = 0; j < BOARDSIZE.HEIGHT; j++) {
+                var color = ((i + j) % 2) === 0 ? COLOR.BLACK : COLOR.WHITE;
+                this.squares[i][j] = new Square(i, j, color);
+
+                var pieceColor = (j <= 1 ? COLOR.WHITE : COLOR.BLACK);
+                if (j === 0 || j === 7) {
+                    if (i === 0 || i === 7) {
+                        this.squares[i][j].setPiece(new Rook(pieceColor));
+                    } else if (i === 1 || i === 6) {
+                        this.squares[i][j].setPiece(new Knight(pieceColor));
+                    } else if (i === 2 || i === 5) {
+                        this.squares[i][j].setPiece(new Bishop(pieceColor));
+                    } else if (i === 3) {
+                        this.squares[i][j].setPiece(new Queen(pieceColor));
+                    } else {
+                        this.squares[i][j].setPiece(new King(pieceColor));
+                    }
+                } else if (j === 1 || j === 6) {
+                    this.squares[i][j].setPiece(new Pawn(pieceColor));
+                } else {
+                    this.squares[i][j].setPiece(null);
+                }
+            }
+        }
+        this.setTurn(1);
+        this.print();
+    }
+
+    move(src, dest) {
+        if (src.getPiece().getColor() !== this.getCurrentPlayer()) {
+            console.log("Move attempted out of turn");
+            return;
+        }
+
+        if (src === dest) {
+            return;
+        }
+
+        if (this.validateMove(src, dest)) {
+            var destPiece = dest.getPiece();
+            src.getPiece().moveTo(src, dest);
+            if (destPiece !== null) {
+                this.addCapturedPiece(destPiece);
+            }
+
+            this.addMoveRecord(src, dest);
+            this.toggleTurn();
+        }
+    }
+
+    addCapturedPiece(piece) {
+        this.capturedPieces.push(piece);
+    }
+    getCapturedPieces() {
+        return this.capturedPieces;
+    }
+    addMoveRecord(src, dest) {
+        this.moveHistory.push({
+            Piece: dest.getPiece().getType(),
+            Color: dest.getPiece().getColor(),
+            From: [src.getX(), src.getY()],
+            To: [dest.getX(), dest.getY()],
+        })
+    }
+    getMoveHistory() {
+        return this.moveHistory;
+    }
+    getMoveRecord(turn) {
+        if (turn >= this.turn || turn <= 0) {
+            throw new Error("Move Record out of bounds.");
+        } else {
+            return this.moveHistory[turn - 1];
+        }
+    }
+
+    toggleTurn() {
+        this.turn++;
+    }
+
+    //Doesn't check for turn.
+    validateMove(src, dest) {
+        console.log("In validate move");
+        var moves = src.getPiece().getMoves(src, this);
+
+        var moveFound = false;
+        for (var i = 0; i < moves.length; i++) {
+            if (moves[i].getX() === dest.getX() && moves[i].getY() === dest.getY()) {
+                moveFound = true;
+                break;
+            }
+        }
+        if (!moveFound) return false;
+
+        //Make the move in a temporary board to see if it leads to check against the moving player.
+        //This test not necessary if the target is enemy king. Also avoids infinite loop.
+        if (!(dest.getPiece() !== null && dest.getPiece().getType() === PIECE.KING)) {
+            var tempBoard = new Board(this);
+
+            var tempSrc = tempBoard.getSquare(src.getX(), src.getY());
+            var tempDest = tempBoard.getSquare(dest.getX(), dest.getY());
+            tempSrc.getPiece().moveTo(tempSrc, tempDest);
+
+            if (tempBoard.isCheck(this.getCurrentPlayer())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    getAllPieces() {
+        var allPieces = [];
+        allPieces[COLOR.WHITE] = [];
+        allPieces[COLOR.BLACK] = [];
+        for (var i = 0; i < BOARDSIZE.WIDTH; i++) {
+            for (var j = 0; j < BOARDSIZE.HEIGHT; j++) {
+                var currSquare = this.getSquare(i, j);
+                //console.log(i+" "+j);
+                //console.log(currSquare);
+                if (currSquare.getPiece() !== null) {
+                    allPieces[currSquare.getPiece().getColor()].push(currSquare);
+                }
+            }
+        }
+        return allPieces;
+    }
+
+    isCheck(player) {
+        console.log("In isCheck()");
+        var rival = togglePlayer(player);
+
+        var allPieces = this.getAllPieces();
+
+        var kingSquare;
+        for (var i = 0; i < allPieces[player].length; i++) {
+            if (allPieces[player][i].getPiece().getType() === PIECE.KING) {
+                kingSquare = allPieces[player][i];
+                break;
+            }
+        }
+        for (var i = 0; i < allPieces[rival].length; i++) {
+            if (this.validateMove(allPieces[rival][i], kingSquare)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    isAnyMovePossible() {
+        var allPieces = this.getAllPieces();
+        console.log("In isAnyMovePossible()");
+
+        for (var i = 0; i < allPieces[this.getCurrentPlayer()].length; i++) {
+
+            var currSquare = allPieces[this.getCurrentPlayer()][i];
+            var currPiece = currSquare.getPiece();
+            var moves = currPiece.getMoves(currSquare, this);
+
+            for (var j = 0; j < moves.length; j++) {
+                if (this.validateMove(currSquare, moves[j])) {
+                    console.log("Move valid");
+                    return true;
+                }
+            }
+        }
+
+        console.log("Returning False");
+        return false;
+    }
+
+    getGameState() {
+        if (!this.isAnyMovePossible()) {
+            console.log("No moves possible. Checking for Checkmate/Stalemate.");
+            if (this.isCheck(this.getCurrentPlayer())) {
+                return GAMESTATE.CHECKMATE;
+            } else {
+                return GAMESTATE.STALEMATE;
+            }
+        } else if (this.isThreeFoldRepetition()) {
+            return GAMESTATE.DRAWN;
+        } else {
+            return GAMESTATE.ACTIVE;
+        }
+    }
+
+    isThreeFoldRepetition() {
+        if (this.turn <= 6) {
+            return false;
+        }
+
+        if (this.getMoveRecord(this.turn - 1) === this.getMoveRecord(this.turn - 5) && this.getMoveRecord(this.turn - 2) === this.getMoveRecord(this.turn - 6)) return true;
+        return false;
+    }
+
+    getTurn() {
+        return this.turn;
+    }
+
+    setTurn(turn) {
+        this.turn = turn;
+    }
+
+    getCurrentPlayer() {
+        if (this.turn % 2 === 0) {
+            return COLOR.BLACK;
+        } else {
+            return COLOR.WHITE;
+        }
+    }
+
+    getRivalPlayer() {
+        return togglePlayer(this.getCurrentPlayer);
+    }
+
+    getSquare(x, y) {
+        if (x < 0 || y < 0 || x > BOARDSIZE.WIDTH - 1 || y > BOARDSIZE.HEIGHT - 1) {
+            console.log("Out of bounds. Returning null");
+            return null;
+        } else {
+            return this.squares[x][y];
+        }
+    }
+
+    print() {
+        var row = " ";
+
+        for (var i = 0; i < BOARDSIZE.WIDTH; i++) {
+            row += "_";
+        }
+
+        console.log(row);
+
+        for (var j = BOARDSIZE.HEIGHT - 1; j >= 0; j--) {
+            row = "|";
+            for (var i = 0; i < BOARDSIZE.WIDTH; i++) {
+                if (this.squares[i][j].isEmpty()) {
+                    row += ".";
+                } else {
+                    if (this.squares[i][j].getPiece().getType() === PIECE.PAWN) {
+                        row += "p";
+                    } else if (this.squares[i][j].getPiece().getType() === PIECE.KING) {
+                        row += "K";
+                    } else if (this.squares[i][j].getPiece().getType() === PIECE.QUEEN) {
+                        row += "Q";
+                    } else if (this.squares[i][j].getPiece().getType() === PIECE.BISHOP) {
+                        row += "B";
+                    } else if (this.squares[i][j].getPiece().getType() === PIECE.ROOK) {
+                        row += "R";
+                    } else if (this.squares[i][j].getPiece().getType() === PIECE.KNIGHT) {
+                        row += "N";
+                    }
+                }
+            }
+            row += "|";
+            console.log(row);
+        }
+    }
+
+    render() {
+        console.log("Rendering new board.");
+        var boardHTML = "";
+        for (var j = 0; j < BOARDSIZE.HEIGHT; j++) {
+            var rowHTML = "";
+            for (var i = 0; i < BOARDSIZE.WIDTH; i++) {
+                var square = this.getSquare(i, j);
+                var color = square.getColor();
+                var pieceImageHTML = "";
+                var id = square.getY() * BOARDSIZE.HEIGHT + square.getX();
+                if (!square.isEmpty()) {
+                    pieceImageHTML = "<img class='noselect' src='images/" + square.getPiece().getColor() + square.getPiece().getType() + ".png' ondragstart='onDragStart(event)'>";  //event listener for drag event. img draggable by default.
+                }
+                //console.log(pieceImageHTML);
+                rowHTML += "<div ondragover='onDragOver(event)' ondrop='onDrop(event)' id=" + id + " class='" + color + " square'>" + pieceImageHTML + "</div>";
+            }
+            boardHTML = rowHTML + boardHTML; //Order important 
+        }
+        //console.log(boardHTML);
+        $(".chessboard").html(boardHTML);
+    }
+}
+
+
+function onDragStart(event) {               //TODO: The piece should not have a copy at the original position while it is beign dragged
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", event.target.parentElement.id);
-    let img = new Image();
-    img.src= event.target.getAttribute("src");
-    event.dataTransfer.setDragImage(img, 30 , 30 ); //30px offset may need to be calculated in relative terms for resposiveness on smaller screens.
+    var id = event.target.parentElement.id;
+    event.dataTransfer.setData("text/plain", id);
+    $("#" + id)
+    var img = new Image();
+    img.src = event.target.getAttribute("src");
+    event.dataTransfer.setDragImage(img, 30, 30); //30px offset may need to be calculated in relative terms for resposiveness on smaller screens.
 }
 
 function onDragOver(event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
 }
+
 function onDrop(event) {
     event.preventDefault();
-    console.log("In onDrop()");
-    let source = event.dataTransfer.getData("text/plain");
-    let dest = event.target.getAttribute("id");
-    if(validateMove(source,dest)===true){
-        console.log(board);
-        board[dest].piece=board[source].piece;
-        board[source].piece="";
-        console.log(board);
-        renderBoard(board);
+    var src = event.dataTransfer.getData("text/plain");
+    var dest;
+    if (event.target.getAttribute("id") === null) {                               //incase target is img element instead of div square. TODO: This is hacky. Find a better solution.
+        dest = event.target.parentElement.getAttribute("id");
+    } else {
+        dest = event.target.getAttribute("id")
+    }
+    board.move(board.getSquare(src % BOARDSIZE.WIDTH, Math.floor(src / BOARDSIZE.WIDTH)), board.getSquare(dest % BOARDSIZE.WIDTH, Math.floor(dest / BOARDSIZE.WIDTH)));
+    board.render();
+    if (board.getGameState() !== GAMESTATE.ACTIVE) {
+        alert("Game Over by " + board.getGameState());
     }
 }
+/*
+class GameController {
+    result;
+    score;
+    players;
 
-function validateMove(source, dest){
-    console.log(source + " " + dest);
-    return true;
-}
-function generateBoard() {
-    let board = [];
-    for (let i = 0; i < totalSquares; i++) {
-        board.push({
-            pos: i,     //TODO: Remove this property as the array index does the same job.
-            piece: initPieceAtPos(i)
-        });
+    play() {
+        var board = new Board();
+        board.init();
+
+        while (board.getGameState() === GAMESTATE.ACTIVE) {
+            var nextMove = this.getNextMove();
+            board.move(board.getSquare(nextMove[0][0], nextMove[0][1]), board.getSquare(nextMove[1][0], nextMove[1][1]));
+            board.print();
+        }
     }
-    console.log("Generated board.");
-    //console.log(board);
-    return board;
-}
 
-let board = generateBoard();
-renderBoard(board);
+    getNextMove() {
+
+        var nextMove = [[4, 1], [4, 2]];
+        console.log("Enter next move in array form");
+        return nextMove;
+    }
+}
+*/
+var board = new Board();
+board.init();
+board.render();
