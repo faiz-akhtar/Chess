@@ -143,16 +143,16 @@ class Pawn extends abstractPiece {
 
         var promoteTo = prompt("Promote pawn to which piece? (Q/R/B/N)");
         if (promoteTo === "Q") {
-            square.setPiece(new Queen(square.getPiece().getColor));
+            square.setPiece(new Queen(square.getPiece().getColor()));
         } else if (promoteTo === "R") {
-            square.setPiece(new Rook(square.getPiece().getColor));
+            square.setPiece(new Rook(square.getPiece().getColor()));
         } else if (promoteTo === "B") {
-            square.setPiece(new Bishop(square.getPiece().getColor));
+            square.setPiece(new Bishop(square.getPiece().getColor()));
         } else if (promoteTo === "N") {
-            square.setPiece(new Knight(square.getPiece().getColor));
+            square.setPiece(new Knight(square.getPiece().getColor()));
         } else {
             alert("Unrecognized piece. Promoting to Queen. You are welcome.");
-            square.setPiece(new Queen(square.getPiece().getColor));
+            square.setPiece(new Queen(square.getPiece().getColor()));
         }
     }
 
@@ -540,7 +540,7 @@ class Board {
             return false;
         }
 
-        if (this.getMoveRecord(this.turn - 1) === this.getMoveRecord(this.turn - 5) && this.getMoveRecord(this.turn - 2) === this.getMoveRecord(this.turn - 6)) return true;
+        if (JSON.stringify(this.getMoveRecord(this.turn - 1)) === JSON.stringify(this.getMoveRecord(this.turn - 5)) && JSON.stringify(this.getMoveRecord(this.turn - 2)) === JSON.stringify(this.getMoveRecord(this.turn - 6))) return true;
         return false;
     }
 
